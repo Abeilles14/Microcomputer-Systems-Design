@@ -1,0 +1,76 @@
+m255
+K4
+z2
+13
+!s112 1.1
+!i10d 8192
+!i10e 25
+!i10f 100
+cModel Technology
+dC:/Users/isabe/Documents/UBC_ELEC/ELEC491/AeroSimFPGA/src
+vARINC429FPGATester_top_tb
+!s110 1675738063
+!i10b 1
+!s100 m`<aXl5lOP;2d5HmoKU[R0
+I637a3NGzFbCP^G`nm=_DS3
+Z0 VDg1SIo80bB@j0V0VzS_@n1
+Z1 dC:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/assignment2
+w1675738040
+Z2 8C:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog_tb.v
+Z3 FC:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog_tb.v
+L0 3
+Z4 OV;L;10.5b;63
+r1
+!s85 0
+31
+!s108 1675738062.000000
+!s107 C:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog_tb.v|
+Z5 !s90 -reportprogress|300|-work|work|-stats=none|C:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog_tb.v|
+!i113 1
+Z6 o-work work
+Z7 tCvgOpt 0
+n@a@r@i@n@c429@f@p@g@a@tester_top_tb
+vM68kDramController_Verilog
+Z8 !s110 1675748766
+!i10b 1
+!s100 ;3[NOf62f:Z_XfBO1<g`B2
+IXZ4`8Vc;Q8dncJ^@G6VfW1
+R0
+R1
+w1675748753
+8C:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog.v
+FC:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog.v
+L0 14
+R4
+r1
+!s85 0
+31
+Z9 !s108 1675748766.000000
+!s107 C:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog.v|
+!s90 -reportprogress|300|-work|work|-stats=none|C:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog.v|
+!i113 1
+R6
+R7
+n@m68k@dram@controller_@verilog
+vM68kDramController_Verilog_tb
+R8
+!i10b 1
+!s100 Nb>9gHT0lAjl7U?Pz3z>h3
+Ic6a[@G7BBMLHPAWM7:4c<0
+R0
+R1
+w1675739183
+R2
+R3
+L0 3
+R4
+r1
+!s85 0
+31
+R9
+!s107 C:/Users/isabe/Documents/UBC_ELEC/CPEN412/assignments/M68kV60-800by480/M68kDramController_Verilog_tb.v|
+R5
+!i113 1
+R6
+R7
+n@m68k@dram@controller_@verilog_tb
