@@ -107,11 +107,19 @@ module M68kDramController_Verilog (
 		parameter RefreshNOP = 5'h07;
 		parameter LoadModeReg = 5'h08;
 		parameter LoadModeRegNOP = 5'h09;
-		parameter LoadRefreshTimer = 5'hA;
-		parameter InitIdle = 5'h0B;
-		parameter InitIdleNOP1 = 5'h0C;
-		parameter InitIdleRefresh = 5'h0D;
-		parameter InitIdleNOP3 = 5'h0E;
+		parameter InitIdle = 5'h0A;
+		parameter InitIdleNOP1 = 5'h0B;
+		parameter InitIdleRefresh = 5'h0C;
+		parameter InitIdleNOP3 = 5'h0D;
+
+		parameter CPUWriteDram = 5'h0E;
+		parameter CPUWriteDramNOP = 5'h0F;
+
+		parameter CPUReadDram = 5'h10;
+		parameter CPUReadDramWaitCAS = 5'h11;
+
+		parameter CPUReadWriteWait = 5'h12;
+
 		
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -242,7 +250,7 @@ module M68kDramController_Verilog (
 		DramDataLatch_H <= 0;										// don't latch data yet
 		CPU_Dtack_L <= 1 ;											// don't acknowledge back to 68000
 		SDramWriteData <= 16'h0000 ;								// nothing to write in particular
-		CPUReset_L <= 0 ;												// default is reset to CPU (for the moment, though this will change when design is complete so that reset-out goes high at the end of the dram initialisation phase to allow CPU to resume)
+		CPUReset_L <= ResetOut_L; //0 ;												// default is reset to CPU (for the moment, though this will change when design is complete so that reset-out goes high at the end of the dram initialisation phase to allow CPU to resume)
 		FPGAWritingtoSDram_H <= 0 ;								// default is to tri-state the FPGA data lines leading to bi-directional SDRam data lines, i.e. assume a read operation
 
 		// COUNTERS
@@ -260,6 +268,7 @@ module M68kDramController_Verilog (
 			// FOR SIMULATION PURPOSES
 			// TimerValue <= 16'h0008;	//	8 us - 100 us			// chose a value equivalent to 100us at 50Mhz clock - you might want to shorten it to somthing small for simulation purposes
 			TimerValue <= 16'h1388;
+			CPUReset_L <= 1'b0;
 			
 			TimerLoad_H <= 1 ;										// on next edge of clock, timer will be loaded and start to time out
 			Command <= PoweringUp ;									// clock enable and chip select to the Zentel Dram chip must be held low (disabled) during a power up phase
@@ -347,27 +356,31 @@ module M68kDramController_Verilog (
 				RefreshTimerLoad_H <= 1'b1;
 			end
 		end
-		// else if(CurrentState == LoadRefreshTimer) begin
-		// 	Command <= NOP;
-
-		// 	// FOR SIMULATION PURPOSES
-		// 	RefreshTimerValue <= 16'h000A; 			// 10 cycles for simulation purposes
-		// 	// RefreshTimerValue <= 16'd375;
-		// 	RefreshTimerLoad_H <= 1'b1;
-
-		// 	NextState <= InitIdle;
-		// end
 		else if(CurrentState == InitIdle) begin
 			// Issuing NOP cmds by default
 			Command <= NOP;
 			NextState <= InitIdle;
+			CPUReset_L <= 1'b1; 				// set reset out to 68k off in IDLE
 
-			// Precharge all banks when timer expires
+			// Precharge all banks  and refresh when timer expires
 			if (RefreshTimerDone_H) begin
 				Command <= PrechargeAllBanks;
 				DramAddress[10] <= 1'b1;
 
 				NextState <= InitIdleNOP1;
+			end
+			// if CPU is accessing the DRAM
+			else if (DramSelect_L == 0 && AS_L == 0) begin
+				DramAddress <= Address[23:11];
+				BankAddress <= Address[25:24];
+				Command <= BankActivate;
+				// if CPU is attempting to READ from SDRAM
+				if (WE_L) begin
+					NextState <= CPUReadDram;
+				end
+				else begin
+					NextState <= CPUWriteDram;
+				end
 			end
 		end
 		// REFRESHING ISSUE 1 NOP
@@ -396,6 +409,71 @@ module M68kDramController_Verilog (
 				// RefreshTimerValue <= 16'd375;
 				RefreshTimerLoad_H <= 1'b1;
 			end
+		end
+		// WRITE DRAM, WAIT FOR UDS OR LDS TO GO LOW
+		else if (CurrentState == CPUWriteDram) begin
+			CPUReset_L <= 1'b1;
+			if (!UDS_L || !LDS_L) begin
+				DramAddress[10:0] <= {1'b1, Address[10:1]}; 	// 10 bit column address
+				BankAddress <= Address[25:24]; 				// 2 bit bank address
+				Command <= WriteAutoPrecharge;
+				CPU_Dtack_L <= 1'b0;
+				FPGAWritingtoSDram_H <= 1'b1; 		// bi-directional data line, drive data into sdram mem
+				SDramWriteData <= DataIn; 				// copy 68k data out bus to sdram mem chip
+				NextState <= CPUWriteDramNOP;
+			end
+			else begin
+				Command <= NOP;
+				NextState <= CPUWriteDram;
+			end
+		end
+		// WAIT ONE CYCLE AFTER WRITE
+		else if (CurrentState == CPUWriteDramNOP) begin
+			CPU_Dtack_L <= 1'b0;
+			Command <= NOP;
+			FPGAWritingtoSDram_H <= 1'b1; 		// bi-directional data line, drive data into sdram mem
+			SDramWriteData <= DataIn; 				// copy 68k data out bus to sdram mem chip
+			NextState <= CPUReadWriteWait;
+		end
+		// READ DRAM
+		else if (CurrentState == CPUReadDram) begin
+			CPUReset_L <= 1'b1;
+			DramAddress[10:0] <= {1'b1, Address[10:1]}; 	// 10 bit column address
+			BankAddress <= Address[25:24]; 				// 2 bit bank address
+			Command <= ReadAutoPrecharge;
+
+			TimerValue <= 16'd2;
+			TimerLoad_H <= 1'b1;
+			NextState <= CPUReadDramWaitCAS;
+		end
+		// READ DRAM WAIT FOR CAS LATENCY (2 CYCLES) TO EXPIRE
+		else if (CurrentState == CPUReadDramWaitCAS) begin
+			CPU_Dtack_L <= 1'b0;
+			Command <= NOP;
+			if (TimerDone_H) begin
+				DramDataLatch_H <= 1'b1; 		// enable capture output from sdram on 2nd clk
+				NextState <= CPUReadWriteWait;
+			end
+			else begin
+				NextState <= CPUReadDramWaitCAS;
+			end
+		end
+		// WAIT FOR 68K TO TERMINATE CURRENT BUS CYCLE
+		else if (CurrentState == CPUReadWriteWait) begin
+			Command <= NOP;
+			if (!UDS_L || !LDS_L) begin
+				CPU_Dtack_L <= 1'b0;
+				NextState <= CPUReadWriteWait;
+			end
+			else begin
+				NextState <= InitIdle;
+			end
+		end
+		// DON'T CREATE MEMORY FOR ANY SIGNALS
+		else begin
+			CPUReset_L <= 1'b1;
+			Command <= NOP;
+			NextState <= InitIdle;
 		end
 	end	// always@ block
 endmodule
