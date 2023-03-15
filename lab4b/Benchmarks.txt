@@ -1,0 +1,16 @@
+Isabelle Andre - 12521589
+Speed Test Program
+
+No Cache 25 MHz Design:
+Time (sec) - 106.43
+Speedup - 1x
+
+Associative Cached 4 Way 8 Line Cache 45 MHz Design:
+Time (sec) - 69.23
+Speedup - 1.54x
+
+Associative Cached 8 Way 128 Line 45 MHz Design:
+Time (sec) - 62.54
+Speedup - 1.70x
+
+
