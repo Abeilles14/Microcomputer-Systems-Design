@@ -81,6 +81,8 @@
 ; #define IIC_Command_Status          (*(volatile unsigned char *)(0x00408008))
 ; // I2C Commands
 ; #define WRITE 0x10
+; #define START 0x91
+; #define ACK 0x21
 ; /*********************************************************************************************************************************
 ; (( DO NOT initialise global variables here, do it main even if you want 0
 ; (( it's a limitation of the compiler
@@ -98,6 +100,7 @@
 ; void SendI2C(char byte, char cmd);
 ; void DAC_Blinky(void);
 ; void WaitForAck(void);
+; void ReadADC(void);
 ; void Init_LCD(void) ;
 ; void LCDOutchar(int c);
 ; void LCDOutMess(char *theMessage);
@@ -2841,16 +2844,17 @@ _SendI2C:
 ; void DAC_Blinky() {
        xdef      _DAC_Blinky
 _DAC_Blinky:
-       move.l    A2,-(A7)
+       movem.l   A2/A3,-(A7)
        lea       _SendI2C.L,A2
+       lea       _printf.L,A3
 ; // Write Address
 ; printf("\r\nSending Slave Address");
        pea       @m68kus~1_53.L
-       jsr       _printf
+       jsr       (A3)
        addq.w    #4,A7
 ; PollTIPFlag();
        jsr       _PollTIPFlag
-; SendI2C(0x90, 0x91);    // ADC/DAC Slave Address at 0x92, Start writing 0x91
+; SendI2C(0x90, START);    // ADC/DAC Slave Address at 0x92, Start writing 0x91
        pea       145
        pea       144
        jsr       (A2)
@@ -2860,7 +2864,7 @@ _DAC_Blinky:
 ; // Set Control
 ; printf("\r\nSending Control Byte");
        pea       @m68kus~1_54.L
-       jsr       _printf
+       jsr       (A3)
        addq.w    #4,A7
 ; SendI2C(0x40, WRITE);     // DAC Output, Write cmd 0x10
        pea       16
@@ -2869,38 +2873,165 @@ _DAC_Blinky:
        addq.w    #8,A7
 ; WaitForAck();
        jsr       _WaitForAck
+; printf("\r\nLED will pulse ON and OFF at a frequency of 500ms, with a duty cycle of 50%");
+       pea       @m68kus~1_55.L
+       jsr       (A3)
+       addq.w    #4,A7
 ; // Continuous data stream w/ Blinky until reset
 ; while (1) {
 DAC_Blinky_1:
-; SendI2C(0xFF, WRITE);
+; SendI2C(0xFF, WRITE);   // ON
        pea       16
        pea       255
        jsr       (A2)
        addq.w    #8,A7
 ; Wait500ms();
        jsr       _Wait500ms
-; SendI2C(0x00, WRITE);
+; SendI2C(0x00, WRITE);   // OFF
        pea       16
        clr.l     -(A7)
-       jsr       (A2)
-       addq.w    #8,A7
-; Wait1s();
-       jsr       _Wait1s
-; SendI2C(0xFF, WRITE);
-       pea       16
-       pea       255
        jsr       (A2)
        addq.w    #8,A7
 ; Wait500ms();
        jsr       _Wait500ms
-; SendI2C(0x00, WRITE);
-       pea       16
-       clr.l     -(A7)
-       jsr       (A2)
-       addq.w    #8,A7
-; Wait1s();
-       jsr       _Wait1s
        bra       DAC_Blinky_1
+; }
+; }
+; void ReadADC() {
+       xdef      _ReadADC
+_ReadADC:
+       link      A6,#-4
+       movem.l   A2/A3/A4/A5,-(A7)
+       lea       _printf.L,A2
+       lea       _PollTIPFlag.L,A3
+       lea       _WaitForAck.L,A4
+       lea       _SendI2C.L,A5
+; char ch0, ch1, ch2, ch3;
+; while (1) {
+ReadADC_1:
+; // Write Address
+; printf("\r\nSending Slave Address");
+       pea       @m68kus~1_53.L
+       jsr       (A2)
+       addq.w    #4,A7
+; PollTIPFlag();
+       jsr       (A3)
+; SendI2C(0x90, START);    // ADC/DAC Slave Address at 0x92, Start writing 0x91
+       pea       145
+       pea       144
+       jsr       (A5)
+       addq.w    #8,A7
+; WaitForAck();
+       jsr       (A4)
+; // Auto Increment A0
+; printf("\r\nAuto Increment A0");
+       pea       @m68kus~1_56.L
+       jsr       (A2)
+       addq.w    #4,A7
+; SendI2C(0x04, WRITE);     // DAC Output, Write cmd 0x10
+       pea       16
+       pea       4
+       jsr       (A5)
+       addq.w    #8,A7
+; WaitForAck();
+       jsr       (A4)
+; // Set Slave Reading Mode
+; printf("\r\nSet Slave Reading Mode");
+       pea       @m68kus~1_57.L
+       jsr       (A2)
+       addq.w    #4,A7
+; PollTIPFlag();
+       jsr       (A3)
+; SendI2C(0x91, START);     // DAC Output, Write cmd 0x10
+       pea       145
+       pea       145
+       jsr       (A5)
+       addq.w    #8,A7
+; WaitForAck();
+       jsr       (A4)
+; // Read data and set ACK
+; IIC_Command_Status = ACK;
+       move.b    #33,4227080
+; printf("\r\nWait for Data");
+       pea       @m68kus~1_58.L
+       jsr       (A2)
+       addq.w    #4,A7
+; // wait for data 0
+; // disconnected, no jumper
+; PollTIPFlag();
+       jsr       (A3)
+; ch0 = IIC_Transmit_Receive;
+       move.b    4227078,-4(A6)
+; IIC_Command_Status = ACK;
+       move.b    #33,4227080
+; printf("\r\nCH0 Data Received");
+       pea       @m68kus~1_59.L
+       jsr       (A2)
+       addq.w    #4,A7
+; // wait for data 1
+; PollTIPFlag();
+       jsr       (A3)
+; ch1 = IIC_Transmit_Receive;
+       move.b    4227078,-3(A6)
+; IIC_Command_Status = ACK;
+       move.b    #33,4227080
+; printf("\r\nCH1 Data Received");
+       pea       @m68kus~1_60.L
+       jsr       (A2)
+       addq.w    #4,A7
+; // wait for data 2
+; PollTIPFlag();
+       jsr       (A3)
+; ch2 = IIC_Transmit_Receive;
+       move.b    4227078,-2(A6)
+; IIC_Command_Status = ACK;
+       move.b    #33,4227080
+; printf("\r\nCH2 Data Received");
+       pea       @m68kus~1_61.L
+       jsr       (A2)
+       addq.w    #4,A7
+; // wait for data 3
+; PollTIPFlag();
+       jsr       (A3)
+; ch3 = IIC_Transmit_Receive;
+       move.b    4227078,-1(A6)
+; printf("\r\nCH3 Data Received");
+       pea       @m68kus~1_62.L
+       jsr       (A2)
+       addq.w    #4,A7
+; IIC_Command_Status = 0x41;
+       move.b    #65,4227080
+; printf("\r\nExt. Analog Source: Disconnected");
+       pea       @m68kus~1_63.L
+       jsr       (A2)
+       addq.w    #4,A7
+; printf("\r\nPotentiometer: %d", ch1);
+       move.b    -3(A6),D1
+       ext.w     D1
+       ext.l     D1
+       move.l    D1,-(A7)
+       pea       @m68kus~1_64.L
+       jsr       (A2)
+       addq.w    #8,A7
+; printf("\r\nThermistor: %d", ch2);
+       move.b    -2(A6),D1
+       ext.w     D1
+       ext.l     D1
+       move.l    D1,-(A7)
+       pea       @m68kus~1_65.L
+       jsr       (A2)
+       addq.w    #8,A7
+; printf("\r\nPhotoresistor: %d", ch3);
+       move.b    -1(A6),D1
+       ext.w     D1
+       ext.l     D1
+       move.l    D1,-(A7)
+       pea       @m68kus~1_66.L
+       jsr       (A2)
+       addq.w    #8,A7
+; Wait1s();
+       jsr       _Wait1s
+       bra       ReadADC_1
 ; }
 ; }
 ; /******************************************************************************************************************************
@@ -2910,21 +3041,21 @@ DAC_Blinky_1:
 ; {
        xdef      _main
 _main:
-       link      A6,#-208
-       movem.l   D2/D3/D4/A2/A3/A4,-(A7)
+       link      A6,#-212
+       movem.l   D2/D3/A2/A3/A4,-(A7)
        lea       _printf.L,A2
        lea       _scanf.L,A3
        lea       _InstallExceptionHandler.L,A4
 ; unsigned int row, i=0, count=0, counter1=1;
-       clr.l     -204(A6)
-       clr.l     -200(A6)
-       move.l    #1,-196(A6)
+       clr.l     -206(A6)
+       clr.l     -202(A6)
+       move.l    #1,-198(A6)
 ; char c, text[150] ;
 ; int PassFailFlag = 1 ;
-       move.l    #1,-40(A6)
+       move.l    #1,-42(A6)
 ; //IIC variables
 ; char choice = '0';
-       moveq     #48,D2
+       move.b    #48,-37(A6)
 ; int WriteData;
 ; int WriteAddress;
 ; int ReadAddress;
@@ -2950,7 +3081,7 @@ _main:
        clr.l     _z.L
        clr.l     _y.L
        clr.l     _x.L
-       clr.l     -204(A6)
+       clr.l     -206(A6)
 ; Timer1Count = Timer2Count = Timer3Count = Timer4Count = 0;
        clr.b     _Timer4Count.L
        clr.b     _Timer3Count.L
@@ -3005,45 +3136,48 @@ _main:
 ; **  User Program
 ; *************************************************************************************************/
 ; printf("\r\nIIC program will begin");
-       pea       @m68kus~1_55.L
+       pea       @m68kus~1_67.L
        jsr       (A2)
        addq.w    #4,A7
 ; printf("\r\nEnter 0 ... Write Single Byte");
-       pea       @m68kus~1_56.L
+       pea       @m68kus~1_68.L
        jsr       (A2)
        addq.w    #4,A7
 ; printf("\r\nEnter 1 ... Read Single Byte");
-       pea       @m68kus~1_57.L
+       pea       @m68kus~1_69.L
        jsr       (A2)
        addq.w    #4,A7
 ; printf("\r\nEnter 2 ... Write Data Block");
-       pea       @m68kus~1_58.L
+       pea       @m68kus~1_70.L
        jsr       (A2)
        addq.w    #4,A7
 ; printf("\r\nEnter 3 ... Read Data Block");
-       pea       @m68kus~1_59.L
+       pea       @m68kus~1_71.L
        jsr       (A2)
        addq.w    #4,A7
 ; printf("\r\nEnter 4 ... Waveform DAC and LED Blinky");
-       pea       @m68kus~1_60.L
+       pea       @m68kus~1_72.L
        jsr       (A2)
        addq.w    #4,A7
 ; printf("\r\nEnter 5 ... Read Analog input from ADC Channel\r\n");
-       pea       @m68kus~1_61.L
+       pea       @m68kus~1_73.L
        jsr       (A2)
        addq.w    #4,A7
-; choice = _getch();
-       jsr       __getch
-       move.b    D0,D2
+; scanf("%c", &choice);
+       pea       -37(A6)
+       pea       @m68kus~1_74.L
+       jsr       (A3)
+       addq.w    #8,A7
 ; IIC_Init();
        jsr       _IIC_Init
 ; while (1) {
 main_1:
 ; if (choice == '0') {
-       cmp.b     #48,D2
+       move.b    -37(A6),D0
+       cmp.b     #48,D0
        bne       main_4
 ; printf("Single Byte Write Initiated\r\nEnter Data Byte: ");
-       pea       @m68kus~1_62.L
+       pea       @m68kus~1_75.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &WriteData);
@@ -3057,7 +3191,7 @@ main_6:
        cmp.l     #255,D0
        ble.s     main_8
 ; printf("Enter Valid Data Byte: ");
-       pea       @m68kus~1_63.L
+       pea       @m68kus~1_76.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &WriteData);
@@ -3069,7 +3203,7 @@ main_6:
 main_8:
 ; }
 ; printf("Enter Address (00000 - 1FFFF): ");
-       pea       @m68kus~1_64.L
+       pea       @m68kus~1_77.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &WriteAddress);
@@ -3083,7 +3217,7 @@ main_9:
        cmp.l     #131071,D0
        ble.s     main_11
 ; printf("Enter Valid Address: ");
-       pea       @m68kus~1_65.L
+       pea       @m68kus~1_78.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", WriteAddress);
@@ -3095,7 +3229,7 @@ main_9:
 main_11:
 ; }
 ; printf("\r\nWriting Data Byte ...");
-       pea       @m68kus~1_66.L
+       pea       @m68kus~1_79.L
        jsr       (A2)
        addq.w    #4,A7
 ; IIC_WriteDataByte(WriteData, WriteAddress);
@@ -3107,10 +3241,11 @@ main_11:
 main_4:
 ; }
 ; else if (choice == '1') {
-       cmp.b     #49,D2
+       move.b    -37(A6),D0
+       cmp.b     #49,D0
        bne       main_12
 ; printf("\r\nSingle Byte Read Initiated\r\nEnter Address (00000 - 1FFFF): ");
-       pea       @m68kus~1_67.L
+       pea       @m68kus~1_80.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &ReadAddress);
@@ -3124,7 +3259,7 @@ main_14:
        cmp.l     #131071,D0
        ble.s     main_16
 ; printf("Enter Valid Address: ");
-       pea       @m68kus~1_65.L
+       pea       @m68kus~1_78.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &ReadAddress);
@@ -3136,7 +3271,7 @@ main_14:
 main_16:
 ; }
 ; printf("\r\nReading Data Byte ...");
-       pea       @m68kus~1_68.L
+       pea       @m68kus~1_81.L
        jsr       (A2)
        addq.w    #4,A7
 ; IIC_ReadDataByte(ReadAddress);
@@ -3147,10 +3282,11 @@ main_16:
 main_12:
 ; }
 ; else if (choice == '2') {
-       cmp.b     #50,D2
+       move.b    -37(A6),D0
+       cmp.b     #50,D0
        bne       main_17
 ; printf("\r\nData Block Write Initiated\r\nEnter Starting Address (00000 - 1FFFF): ");
-       pea       @m68kus~1_69.L
+       pea       @m68kus~1_82.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &WriteBlockAddress);
@@ -3164,7 +3300,7 @@ main_19:
        cmp.l     #131071,D0
        ble.s     main_21
 ; printf("Enter Valid Address: ");
-       pea       @m68kus~1_65.L
+       pea       @m68kus~1_78.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &WriteBlockAddress);
@@ -3178,10 +3314,10 @@ main_21:
 ; WriteBlockMaxSize = (0x1FFFF - WriteBlockAddress);
        move.l    #131071,D0
        sub.l     -24(A6),D0
-       move.l    D0,D4
+       move.l    D0,D3
 ; printf("Enter Data Block Size (00000 - %05X): ", WriteBlockMaxSize);
-       move.l    D4,-(A7)
-       pea       @m68kus~1_70.L
+       move.l    D3,-(A7)
+       pea       @m68kus~1_83.L
        jsr       (A2)
        addq.w    #8,A7
 ; scanf("%x", &WriteBlockSize);
@@ -3191,11 +3327,11 @@ main_21:
        addq.w    #8,A7
 ; while (WriteBlockSize > WriteBlockMaxSize) {
 main_22:
-       cmp.l     -20(A6),D4
+       cmp.l     -20(A6),D3
        bge.s     main_24
 ; printf("Enter Valid Block Size (00000 - %05X): ", WriteBlockMaxSize);
-       move.l    D4,-(A7)
-       pea       @m68kus~1_71.L
+       move.l    D3,-(A7)
+       pea       @m68kus~1_84.L
        jsr       (A2)
        addq.w    #8,A7
 ; scanf("%x", &WriteBlockSize);
@@ -3207,7 +3343,7 @@ main_22:
 main_24:
 ; }
 ; printf("Enter Starting Data Byte: ");
-       pea       @m68kus~1_72.L
+       pea       @m68kus~1_85.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &WriteBlockDataStart);
@@ -3221,7 +3357,7 @@ main_25:
        cmp.l     #255,D0
        ble.s     main_27
 ; printf("Enter Valid Data Byte: ");
-       pea       @m68kus~1_63.L
+       pea       @m68kus~1_76.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &WriteBlockDataStart);
@@ -3242,10 +3378,11 @@ main_27:
 main_17:
 ; }
 ; else if (choice == '3') {
-       cmp.b     #51,D2
+       move.b    -37(A6),D0
+       cmp.b     #51,D0
        bne       main_28
 ; printf("\r\nData Block Read Initiated\r\nEnter Starting Address (00000 - 1FFFF): ");
-       pea       @m68kus~1_73.L
+       pea       @m68kus~1_86.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &ReadBlockAddress);
@@ -3259,7 +3396,7 @@ main_30:
        cmp.l     #131071,D0
        ble.s     main_32
 ; printf("Enter Valid Address");
-       pea       @m68kus~1_74.L
+       pea       @m68kus~1_87.L
        jsr       (A2)
        addq.w    #4,A7
 ; scanf("%x", &ReadBlockAddress);
@@ -3273,10 +3410,10 @@ main_32:
 ; ReadBlockMaxSize = (0x1FFFF - ReadBlockAddress);
        move.l    #131071,D0
        sub.l     -12(A6),D0
-       move.l    D0,D3
+       move.l    D0,D2
 ; printf("Enter Data Block Size (00000 - %05X): ", ReadBlockMaxSize);
-       move.l    D3,-(A7)
-       pea       @m68kus~1_70.L
+       move.l    D2,-(A7)
+       pea       @m68kus~1_83.L
        jsr       (A2)
        addq.w    #8,A7
 ; scanf("%x", &ReadBlockSize);
@@ -3286,11 +3423,11 @@ main_32:
        addq.w    #8,A7
 ; while (ReadBlockSize > ReadBlockMaxSize) {
 main_33:
-       cmp.l     -8(A6),D3
+       cmp.l     -8(A6),D2
        bge.s     main_35
 ; printf("Enter Valid Block Size (00000 - %05X): ", ReadBlockMaxSize);
-       move.l    D3,-(A7)
-       pea       @m68kus~1_71.L
+       move.l    D2,-(A7)
+       pea       @m68kus~1_84.L
        jsr       (A2)
        addq.w    #8,A7
 ; scanf("%x", &ReadBlockSize);
@@ -3305,10 +3442,11 @@ main_28:
 ; }
 ; }
 ; else if (choice == '4') {
-       cmp.b     #52,D2
+       move.b    -37(A6),D0
+       cmp.b     #52,D0
        bne.s     main_36
 ; printf("\r\nWaveform DAC and LED Blinky Initiated\r\n");
-       pea       @m68kus~1_75.L
+       pea       @m68kus~1_88.L
        jsr       (A2)
        addq.w    #4,A7
 ; DAC_Blinky();
@@ -3317,24 +3455,27 @@ main_28:
 main_36:
 ; }
 ; else if (choice == '5') {
-       cmp.b     #53,D2
+       move.b    -37(A6),D0
+       cmp.b     #53,D0
        bne.s     main_38
 ; printf("\r\nRead Analog input from ADC Channel Initiated");
-       pea       @m68kus~1_76.L
+       pea       @m68kus~1_89.L
        jsr       (A2)
        addq.w    #4,A7
+; ReadADC();
+       jsr       _ReadADC
        bra.s     main_39
 main_38:
 ; }
 ; else {
 ; printf("\r\nInvalid Selection, Please Select an Option Between 0-5.");
-       pea       @m68kus~1_77.L
+       pea       @m68kus~1_90.L
        jsr       (A2)
        addq.w    #4,A7
 main_39:
 ; }
 ; printf("\r\nProgram ended");
-       pea       @m68kus~1_78.L
+       pea       @m68kus~1_91.L
        jsr       (A2)
        addq.w    #4,A7
        bra       main_1
@@ -3560,107 +3701,151 @@ main_39:
        dc.b      13,10,83,101,110,100,105,110,103,32,67,111,110
        dc.b      116,114,111,108,32,66,121,116,101,0
 @m68kus~1_55:
+       dc.b      13,10,76,69,68,32,119,105,108,108,32,112,117
+       dc.b      108,115,101,32,79,78,32,97,110,100,32,79,70
+       dc.b      70,32,97,116,32,97,32,102,114,101,113,117,101
+       dc.b      110,99,121,32,111,102,32,53,48,48,109,115,44
+       dc.b      32,119,105,116,104,32,97,32,100,117,116,121
+       dc.b      32,99,121,99,108,101,32,111,102,32,53,48,37
+       dc.b      0
+@m68kus~1_56:
+       dc.b      13,10,65,117,116,111,32,73,110,99,114,101,109
+       dc.b      101,110,116,32,65,48,0
+@m68kus~1_57:
+       dc.b      13,10,83,101,116,32,83,108,97,118,101,32,82
+       dc.b      101,97,100,105,110,103,32,77,111,100,101,0
+@m68kus~1_58:
+       dc.b      13,10,87,97,105,116,32,102,111,114,32,68,97
+       dc.b      116,97,0
+@m68kus~1_59:
+       dc.b      13,10,67,72,48,32,68,97,116,97,32,82,101,99
+       dc.b      101,105,118,101,100,0
+@m68kus~1_60:
+       dc.b      13,10,67,72,49,32,68,97,116,97,32,82,101,99
+       dc.b      101,105,118,101,100,0
+@m68kus~1_61:
+       dc.b      13,10,67,72,50,32,68,97,116,97,32,82,101,99
+       dc.b      101,105,118,101,100,0
+@m68kus~1_62:
+       dc.b      13,10,67,72,51,32,68,97,116,97,32,82,101,99
+       dc.b      101,105,118,101,100,0
+@m68kus~1_63:
+       dc.b      13,10,69,120,116,46,32,65,110,97,108,111,103
+       dc.b      32,83,111,117,114,99,101,58,32,68,105,115,99
+       dc.b      111,110,110,101,99,116,101,100,0
+@m68kus~1_64:
+       dc.b      13,10,80,111,116,101,110,116,105,111,109,101
+       dc.b      116,101,114,58,32,37,100,0
+@m68kus~1_65:
+       dc.b      13,10,84,104,101,114,109,105,115,116,111,114
+       dc.b      58,32,37,100,0
+@m68kus~1_66:
+       dc.b      13,10,80,104,111,116,111,114,101,115,105,115
+       dc.b      116,111,114,58,32,37,100,0
+@m68kus~1_67:
        dc.b      13,10,73,73,67,32,112,114,111,103,114,97,109
        dc.b      32,119,105,108,108,32,98,101,103,105,110,0
-@m68kus~1_56:
+@m68kus~1_68:
        dc.b      13,10,69,110,116,101,114,32,48,32,46,46,46,32
        dc.b      87,114,105,116,101,32,83,105,110,103,108,101
        dc.b      32,66,121,116,101,0
-@m68kus~1_57:
+@m68kus~1_69:
        dc.b      13,10,69,110,116,101,114,32,49,32,46,46,46,32
        dc.b      82,101,97,100,32,83,105,110,103,108,101,32,66
        dc.b      121,116,101,0
-@m68kus~1_58:
+@m68kus~1_70:
        dc.b      13,10,69,110,116,101,114,32,50,32,46,46,46,32
        dc.b      87,114,105,116,101,32,68,97,116,97,32,66,108
        dc.b      111,99,107,0
-@m68kus~1_59:
+@m68kus~1_71:
        dc.b      13,10,69,110,116,101,114,32,51,32,46,46,46,32
        dc.b      82,101,97,100,32,68,97,116,97,32,66,108,111
        dc.b      99,107,0
-@m68kus~1_60:
+@m68kus~1_72:
        dc.b      13,10,69,110,116,101,114,32,52,32,46,46,46,32
        dc.b      87,97,118,101,102,111,114,109,32,68,65,67,32
        dc.b      97,110,100,32,76,69,68,32,66,108,105,110,107
        dc.b      121,0
-@m68kus~1_61:
+@m68kus~1_73:
        dc.b      13,10,69,110,116,101,114,32,53,32,46,46,46,32
        dc.b      82,101,97,100,32,65,110,97,108,111,103,32,105
        dc.b      110,112,117,116,32,102,114,111,109,32,65,68
        dc.b      67,32,67,104,97,110,110,101,108,13,10,0
-@m68kus~1_62:
+@m68kus~1_74:
+       dc.b      37,99,0
+@m68kus~1_75:
        dc.b      83,105,110,103,108,101,32,66,121,116,101,32
        dc.b      87,114,105,116,101,32,73,110,105,116,105,97
        dc.b      116,101,100,13,10,69,110,116,101,114,32,68,97
        dc.b      116,97,32,66,121,116,101,58,32,0
-@m68kus~1_63:
+@m68kus~1_76:
        dc.b      69,110,116,101,114,32,86,97,108,105,100,32,68
        dc.b      97,116,97,32,66,121,116,101,58,32,0
-@m68kus~1_64:
+@m68kus~1_77:
        dc.b      69,110,116,101,114,32,65,100,100,114,101,115
        dc.b      115,32,40,48,48,48,48,48,32,45,32,49,70,70,70
        dc.b      70,41,58,32,0
-@m68kus~1_65:
+@m68kus~1_78:
        dc.b      69,110,116,101,114,32,86,97,108,105,100,32,65
        dc.b      100,100,114,101,115,115,58,32,0
-@m68kus~1_66:
+@m68kus~1_79:
        dc.b      13,10,87,114,105,116,105,110,103,32,68,97,116
        dc.b      97,32,66,121,116,101,32,46,46,46,0
-@m68kus~1_67:
+@m68kus~1_80:
        dc.b      13,10,83,105,110,103,108,101,32,66,121,116,101
        dc.b      32,82,101,97,100,32,73,110,105,116,105,97,116
        dc.b      101,100,13,10,69,110,116,101,114,32,65,100,100
        dc.b      114,101,115,115,32,40,48,48,48,48,48,32,45,32
        dc.b      49,70,70,70,70,41,58,32,0
-@m68kus~1_68:
+@m68kus~1_81:
        dc.b      13,10,82,101,97,100,105,110,103,32,68,97,116
        dc.b      97,32,66,121,116,101,32,46,46,46,0
-@m68kus~1_69:
+@m68kus~1_82:
        dc.b      13,10,68,97,116,97,32,66,108,111,99,107,32,87
        dc.b      114,105,116,101,32,73,110,105,116,105,97,116
        dc.b      101,100,13,10,69,110,116,101,114,32,83,116,97
        dc.b      114,116,105,110,103,32,65,100,100,114,101,115
        dc.b      115,32,40,48,48,48,48,48,32,45,32,49,70,70,70
        dc.b      70,41,58,32,0
-@m68kus~1_70:
+@m68kus~1_83:
        dc.b      69,110,116,101,114,32,68,97,116,97,32,66,108
        dc.b      111,99,107,32,83,105,122,101,32,40,48,48,48
        dc.b      48,48,32,45,32,37,48,53,88,41,58,32,0
-@m68kus~1_71:
+@m68kus~1_84:
        dc.b      69,110,116,101,114,32,86,97,108,105,100,32,66
        dc.b      108,111,99,107,32,83,105,122,101,32,40,48,48
        dc.b      48,48,48,32,45,32,37,48,53,88,41,58,32,0
-@m68kus~1_72:
+@m68kus~1_85:
        dc.b      69,110,116,101,114,32,83,116,97,114,116,105
        dc.b      110,103,32,68,97,116,97,32,66,121,116,101,58
        dc.b      32,0
-@m68kus~1_73:
+@m68kus~1_86:
        dc.b      13,10,68,97,116,97,32,66,108,111,99,107,32,82
        dc.b      101,97,100,32,73,110,105,116,105,97,116,101
        dc.b      100,13,10,69,110,116,101,114,32,83,116,97,114
        dc.b      116,105,110,103,32,65,100,100,114,101,115,115
        dc.b      32,40,48,48,48,48,48,32,45,32,49,70,70,70,70
        dc.b      41,58,32,0
-@m68kus~1_74:
+@m68kus~1_87:
        dc.b      69,110,116,101,114,32,86,97,108,105,100,32,65
        dc.b      100,100,114,101,115,115,0
-@m68kus~1_75:
+@m68kus~1_88:
        dc.b      13,10,87,97,118,101,102,111,114,109,32,68,65
        dc.b      67,32,97,110,100,32,76,69,68,32,66,108,105,110
        dc.b      107,121,32,73,110,105,116,105,97,116,101,100
        dc.b      13,10,0
-@m68kus~1_76:
+@m68kus~1_89:
        dc.b      13,10,82,101,97,100,32,65,110,97,108,111,103
        dc.b      32,105,110,112,117,116,32,102,114,111,109,32
        dc.b      65,68,67,32,67,104,97,110,110,101,108,32,73
        dc.b      110,105,116,105,97,116,101,100,0
-@m68kus~1_77:
+@m68kus~1_90:
        dc.b      13,10,73,110,118,97,108,105,100,32,83,101,108
        dc.b      101,99,116,105,111,110,44,32,80,108,101,97,115
        dc.b      101,32,83,101,108,101,99,116,32,97,110,32,79
        dc.b      112,116,105,111,110,32,66,101,116,119,101,101
        dc.b      110,32,48,45,53,46,0
-@m68kus~1_78:
+@m68kus~1_91:
        dc.b      13,10,80,114,111,103,114,97,109,32,101,110,100
        dc.b      101,100,0
        section   bss

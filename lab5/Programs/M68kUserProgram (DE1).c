@@ -102,6 +102,8 @@
 
 // I2C Commands
 #define WRITE 0x10
+#define START 0x91
+#define ACK 0x21
 
 /*********************************************************************************************************************************
 (( DO NOT initialise global variables here, do it main even if you want 0
@@ -122,6 +124,7 @@ void Wait1s(void);
 void SendI2C(char byte, char cmd);
 void DAC_Blinky(void);
 void WaitForAck(void);
+void ReadADC(void);
 
 void Init_LCD(void) ;
 void LCDOutchar(int c);
@@ -1090,7 +1093,7 @@ void DAC_Blinky() {
     // Write Address
     printf("\r\nSending Slave Address");
     PollTIPFlag();
-    SendI2C(0x90, 0x91);    // ADC/DAC Slave Address at 0x92, Start writing 0x91
+    SendI2C(0x90, START);    // ADC/DAC Slave Address at 0x92, Start writing 0x91
     WaitForAck();
 
     // Set Control
@@ -1106,6 +1109,67 @@ void DAC_Blinky() {
         Wait500ms();
         SendI2C(0x00, WRITE);   // OFF
         Wait500ms();
+    }
+}
+
+void ReadADC() {
+    char ch0, ch1, ch2, ch3;
+
+    while (1) {
+        // Write Address
+        printf("\r\nSending Slave Address");
+        PollTIPFlag();
+        SendI2C(0x90, START);    // ADC/DAC Slave Address at 0x92, Start writing 0x91
+        WaitForAck();
+
+        // Auto Increment A0
+        printf("\r\nAuto Increment A0");
+        SendI2C(0x04, WRITE);     // DAC Output, Write cmd 0x10
+        WaitForAck();
+
+        // Set Slave Reading Mode
+        printf("\r\nSet Slave Reading Mode");
+        PollTIPFlag();
+        SendI2C(0x91, START);     // DAC Output, Write cmd 0x10
+        WaitForAck();
+
+        // Read data and set ACK
+        IIC_Command_Status = ACK;
+
+        printf("\r\nWait for Data");
+        // wait for data 0
+        // disconnected, no jumper
+        PollTIPFlag();
+        ch0 = IIC_Transmit_Receive;
+        IIC_Command_Status = ACK;
+        printf("\r\nCH0 Data Received");
+
+        // wait for data 1
+        PollTIPFlag();
+        ch1 = IIC_Transmit_Receive;
+        IIC_Command_Status = ACK;
+        printf("\r\nCH1 Data Received");
+
+        // wait for data 2
+        PollTIPFlag();
+        ch2 = IIC_Transmit_Receive;
+        IIC_Command_Status = ACK;
+        printf("\r\nCH2 Data Received");
+
+        // wait for data 3
+        PollTIPFlag();
+        ch3 = IIC_Transmit_Receive;
+        printf("\r\nCH3 Data Received");
+
+        IIC_Command_Status = 0x41;
+        
+        printf("\r\n............................");
+        printf("\r\nExt. Analog Source: Disconnected");
+        printf("\r\nPotentiometer: %d", ch3);
+        printf("\r\nThermistor: %d", ch1);
+        printf("\r\nPhotoresistor: %d", ch2);
+        
+        Wait1s();
     }
 }
 
@@ -1183,7 +1247,7 @@ void main()
     printf("\r\nEnter 3 ... Read Data Block");
     printf("\r\nEnter 4 ... Waveform DAC and LED Blinky");
     printf("\r\nEnter 5 ... Read Analog input from ADC Channel\r\n");
-    choice = _getch();
+    scanf("%c", &choice);
 
     IIC_Init();
 
@@ -1259,6 +1323,7 @@ void main()
         }
         else if (choice == '5') {
             printf("\r\nRead Analog input from ADC Channel Initiated");
+            ReadADC();
         }
         else {
             printf("\r\nInvalid Selection, Please Select an Option Between 0-5.");
