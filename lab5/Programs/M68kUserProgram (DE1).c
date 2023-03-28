@@ -100,6 +100,9 @@
 #define IIC_Transmit_Receive        (*(volatile unsigned char *)(0x00408006))
 #define IIC_Command_Status          (*(volatile unsigned char *)(0x00408008))
 
+// I2C Commands
+#define WRITE 0x10
+
 /*********************************************************************************************************************************
 (( DO NOT initialise global variables here, do it main even if you want 0
 (( it's a limitation of the compiler
@@ -114,6 +117,12 @@ unsigned char Timer1Count, Timer2Count, Timer3Count, Timer4Count ;
 *******************************************************************************************/
 void Wait1ms(void);
 void Wait3ms(void);
+void Wait500ms(void);
+void Wait1s(void);
+void SendI2C(char byte, char cmd);
+void DAC_Blinky(void);
+void WaitForAck(void);
+
 void Init_LCD(void) ;
 void LCDOutchar(int c);
 void LCDOutMess(char *theMessage);
@@ -1058,6 +1067,47 @@ void IIC_WriteDataBlock(int address, int blocksize, int blockstart){
 
 }
 
+void Wait500ms(void)
+{
+    int i;
+    for (i = 0; i < 500; i++)
+        Wait1ms();
+}
+
+void Wait1s(void)
+{
+    int i;
+    for (i = 0; i < 1000; i++)
+        Wait1ms();
+}
+
+void SendI2C(char byte, char cmd) {
+    IIC_Transmit_Receive = byte;
+    IIC_Command_Status = cmd;
+}
+
+void DAC_Blinky() {
+    // Write Address
+    printf("\r\nSending Slave Address");
+    PollTIPFlag();
+    SendI2C(0x90, 0x91);    // ADC/DAC Slave Address at 0x92, Start writing 0x91
+    WaitForAck();
+
+    // Set Control
+    printf("\r\nSending Control Byte");
+    SendI2C(0x40, WRITE);     // DAC Output, Write cmd 0x10
+    WaitForAck();
+
+    printf("\r\nLED will pulse ON and OFF at a frequency of 500ms, with a duty cycle of 50%");
+
+    // Continuous data stream w/ Blinky until reset
+    while (1) {
+        SendI2C(0xFF, WRITE);   // ON
+        Wait500ms();
+        SendI2C(0x00, WRITE);   // OFF
+        Wait500ms();
+    }
+}
 
 
 /******************************************************************************************************************************
@@ -1131,9 +1181,8 @@ void main()
     printf("\r\nEnter 1 ... Read Single Byte");
     printf("\r\nEnter 2 ... Write Data Block");
     printf("\r\nEnter 3 ... Read Data Block");
-    printf("\r\nEnter 4 ... Waveform DAC Function and LED");
+    printf("\r\nEnter 4 ... Waveform DAC and LED Blinky");
     printf("\r\nEnter 5 ... Read Analog input from ADC Channel\r\n");
-    //scanf("%c", &choice);
     choice = _getch();
 
     IIC_Init();
@@ -1205,13 +1254,14 @@ void main()
 
         }
         else if (choice == '4') {
-            printf("\r\nRead 128k Byte")
+            printf("\r\nWaveform DAC and LED Blinky Initiated\r\n");
+            DAC_Blinky();
         }
         else if (choice == '5') {
-            printf("\r\nRead 128k Byte")
+            printf("\r\nRead Analog input from ADC Channel Initiated");
         }
         else {
-            printf("\r\nInvalid Selection, Please Select an Option Between 0-5.")
+            printf("\r\nInvalid Selection, Please Select an Option Between 0-5.");
         }
         printf("\r\nProgram ended");
     }
