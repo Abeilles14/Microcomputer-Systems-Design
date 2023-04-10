@@ -379,7 +379,7 @@ int Get8HexDigits(char *CheckSumPtr)
 }
 
 /**************************************************************************************************
-*Memory Test Functions
+*Memory Test Functions:    IGNORE FOR LAB 5
 ***************************************************************************************************/
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //byte_func//
@@ -822,9 +822,17 @@ void longword_func(void){
     }
 }
 
+/*****************************************************************************************************************************/
+
+//LAB 5 IIC BEGINS HERE
+
 //////////////////////////////////////////////////////////
 //******IIC Program Functions Begin Here***************///
 //////////////////////////////////////////////////////////
+
+
+
+/******************************************************************************************************************************/
 
 void IIC_Init(void)
 {
@@ -838,7 +846,7 @@ void IIC_Init(void)
 
     //IIC_Transmit_Receive = 0x00;
     //IIC_Command_Status = 0x00;
-    printf("\r\n%x",IIC_Command_Status);
+    //printf("\r\n%x",IIC_Command_Status);
 
 }
 
@@ -854,102 +862,94 @@ void PollTIPFlag(void){
     }
 }
 
+void Delay(void){
+    int i;
+    int counter = 0;
+
+    for (i = 0; i < 2000; i++){
+        counter = counter + 1;
+    }
+}
+
 void IIC_StartCommand(int block_sel){
-    char dog;
-    int cat*;
     int slave_addr = 0x00;
 
     if (block_sel == 0){
-        printf("\r\nBlock is set to 0");
+        //printf("\r\nBlock is set to 0");
         slave_addr = 0xA0;
     }
     else if (block_sel == 1){
-        printf("\r\nBlock is set to 1");
+        //printf("\r\nBlock is set to 1");
         slave_addr = 0xA2;
     }
-    printf("\r\nSending Start Command...");
-    printf("\r\nControl Register is %x", IIC_Control);
-    //Check that no transmit is in progress
-    //IIC_Command_Status = 0x80;
-    //PollTIPFlag();
-    dog = IIC_Command_Status;
-    printf("\r\n%x", dog);
 
+    PollTIPFlag();
     IIC_Transmit_Receive = slave_addr; //Slave Adress and write bit
     //IIC_Command_Status = 0x10; //Set STA and WR bit
-    IIC_Command_Status = 0x90;
+    //printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
+    Delay();
+    IIC_Command_Status = 0x90; //set WR bit
+    Delay();
 
-    dog = IIC_Command_Status;
-    printf("\r\n%x", dog);
     //Wait for transmit to complete
     PollTIPFlag();
 
     WaitForAck();
-    printf("\r\nStart Command Received");
 }
 
 void IIC_RepeatedStartCommand(int block_sel){
     int slave_addr = 0x00;
 
     if (block_sel == 0){
-        printf("\r\nBlock is set to 0");
+        //printf("\r\nBlock is set to 0");
         slave_addr = 0xA1;
     }
     else if (block_sel == 1){
-        printf("\r\nBlock is set to 1");
+        //printf("\r\nBlock is set to 1");
         slave_addr = 0xA3;
     }
 
-    printf("\r\nSending Start Command...");
-    printf("\r\nControl Register is %x", IIC_Control);
-    //Check that no transmit is in progress
-    //IIC_Command_Status = 0x80;
-    //PollTIPFlag();
-
-    IIC_Transmit_Receive = slave_addr; //Slave Adress and write bit
-    //IIC_Command_Status = 0x10; //Set STA and WR bit
-    printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
-    IIC_Command_Status = 0x90; //
-    printf("\r\nTransmit/receive after: %x", IIC_Transmit_Receive);
-
-
-    //Wait for transmit to complete
     PollTIPFlag();
+    IIC_Transmit_Receive = slave_addr; //Slave Adress and write bit
+
+    Delay();
+    //Wait3ms();
+    IIC_Command_Status = 0x90; //
+    Delay();
 
     WaitForAck();
-    printf("\r\nStart Command Received");
+    //printf("\r\nStart Command Received");
 }
 
 void IIC_SendAddress(int address_high, int address_low){
 
-    printf("\r\nSending address");
+    //printf("\r\nSending address");
 
     //IIC_Command_Status = 0x10;
+    PollTIPFlag();
     IIC_Transmit_Receive = address_high; //High byte internal address
 
-    printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
+    Delay();
     IIC_Command_Status = 0x10; //set WR bit
-    printf("\r\nTransmit/receive after: %x", IIC_Transmit_Receive);
+    Delay();
 
     //Wait for transmit to complete
     PollTIPFlag();
 
     WaitForAck();
-    printf("\r\nHigh byte address sent");
 
-
-    //IIC_Command_Status = 0x10;
     IIC_Transmit_Receive = address_low; //Low byte internal address
+    PollTIPFlag();
 
-    printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
+    Delay();
     IIC_Command_Status = 0x10; //set WR bit
-    printf("\r\nTransmit/receive after: %x", IIC_Transmit_Receive);
+    Delay();
 
     //Wait for transmit to complete
     PollTIPFlag();
 
     WaitForAck();
-    printf("\r\nLow byte address sent");
+    //printf("\r\nLow byte address sent");
 }
 
 void IIC_WriteData(int data){
@@ -958,9 +958,9 @@ void IIC_WriteData(int data){
 
     IIC_Transmit_Receive = data; //High byte internal address
 
-    printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
+    Delay();
     IIC_Command_Status = 0x10; //set WR bit
-    printf("\r\nTransmit/receive after: %x", IIC_Transmit_Receive);
+    Delay();
 
     //Wait for transmit to complete
     PollTIPFlag();
@@ -970,32 +970,107 @@ void IIC_WriteData(int data){
     IIC_Command_Status = 0x40; //Set STO bit
     PollTIPFlag();
 
-    printf("\r\nData Writen");
+    //printf("\r\nData Writen");
 }
 
-void IIC_ReadData(void){
+void IIC_PageWrite(int data, int numbytes, int address){
+    int i = 0x00;
+    int j = 0x00;
+    int count = 0;
+
+    //printf("\r\nData Written To Memory");
+    while (j < numbytes){
+        if ((data + i) > 0xFF){
+            data = 0x00;
+            i = 0x00;
+        }
+        IIC_Transmit_Receive = (data + i);
+        if ((count == 0) || ((count % 16) == 0)){
+            printf("\r\nAddress %05X: ", (address + count));
+        }
+        printf("%02X ", (data + i));
+        //printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
+        Delay();
+        IIC_Command_Status = 0x10; //set WR bit
+        Delay();
+
+        PollTIPFlag();
+        WaitForAck();
+        i += 1;
+        count = count + 1;
+        j += 1;
+    }
+
+    IIC_Command_Status = 0x40; //Set STO bit
+    PollTIPFlag();
+}
+
+void IIC_ReadData(int num){
     int recieved;
 
-    printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
-    IIC_Command_Status = 0x20; //set WR bit
-    printf("\r\nTransmit/receive after: %x", IIC_Transmit_Receive);
+    //printf("\r\nTransmit/receive before: %x", IIC_Transmit_Receive);
+    Delay();
+    IIC_Command_Status = 0x20; //set R bit
+    Delay();
     PollTIPFlag();
 
+    //printf("\r\n");
     while ((IIC_Command_Status & 0x01) != 1){
         1;
     }
-    //IIC_Command_Status &= 0xFE;
-
     recieved = IIC_Transmit_Receive;
 
-    printf("\r\nDATA READ IS: %02X", recieved);
+    if (num == 0){
+        printf("\r\nDATA READ IS %02X ", recieved);
+    }
 
     //IIC_Command_Status |= 0x48; //set STO bit, ACK bit
+    Delay();
     IIC_Command_Status = 0x48;
+    Delay();
+    PollTIPFlag();
 
     recieved = IIC_Transmit_Receive;
+}
 
+void IIC_SequentialRead(int blocksize, int address){
+    int received;
+    int i = 0;
+    int count = 0;
+    int hold;
+    //printf("1:%x ", IIC_Command_Status);
+    while (i < blocksize){
+        PollTIPFlag();
+        Delay();
+        IIC_Command_Status = 0x20; //set R bit
+        //printf("3:%x ", IIC_Command_Status);
+        Delay();
+        //Wait3ms();
+        //printf("\r\nTransmit/receive after: %x", IIC_Transmit_Receive);
+        PollTIPFlag();
+        WaitForAck();
 
+        while ((IIC_Command_Status & 0x01) != 1){
+            1;
+        }
+
+        received = IIC_Transmit_Receive;
+
+        if ((count == 0) || ((count % 16) == 0)){
+            printf("\r\nAddress %05X: ", address);
+        }
+        printf("%02X ", received);
+
+        count += 1;
+        i += 1;
+        address = address + 1;
+        //hold = IIC_Transmit_Receive;
+        //printf("Hold 3: %x ", hold);
+    }
+
+    IIC_Command_Status = 0x08;
+    PollTIPFlag();
+    IIC_Command_Status = 0x41;
 }
 
 int CheckAck(void){
@@ -1036,7 +1111,7 @@ void IIC_WriteDataByte(int data, int address){
 
 }
 
-void IIC_ReadDataByte(int address){
+void IIC_ReadDataByte(int address, int num){
     int block_sel = (address >> 16) & 0xF;  // extract most significant byte
     int address_high = (address >> 8) & 0xFF;  // extract high byte
     int address_low = address & 0xFF;  // extract low byte
@@ -1044,44 +1119,158 @@ void IIC_ReadDataByte(int address){
 
     //Send start command
     IIC_StartCommand(block_sel);
-
+    //printf("\r\nStart");
     IIC_SendAddress(address_high, address_low);
-
+    //printf("\r\nAddress");
     IIC_RepeatedStartCommand(block_sel);
-
-    IIC_ReadData();
+    //printf("\r\nRepStart");
+    if (num == 0){
+        IIC_ReadData(0);
+    }
+    else{
+        IIC_ReadData(1);
+    }
 }
 
-void IIC_WriteDataBlock(int address, int blocksize, int blockstart){
-    int block_sel = (address >> 16) & 0xF;  // extract most significant byte
-    int address_high = (address >> 8) & 0xFF;  // extract high byte
-    int address_low = address & 0xFF;  // extract low byte
+void IIC_WriteDataBlock(int address, int blocksize, int datastart){
+    int block_sel;// = (address >> 16) & 0xF;  // extract most significant byte
+    int address_high;// = (address >> 8) & 0xFF;  // extract high byte
+    int address_low;// = address & 0xFF;  // extract low byte
 
-    // print the results
-    printf("\r\nBlock Sel: %X", block_sel);
-    printf("\r\nAddress High: %X", address_high);
-    printf("\r\nAddress Low: %X", address_low);
+    int data = datastart;
+    int numbytes = 0;
+    int byteswritten = 0;
 
-    //Send start command
-    IIC_StartCommand(block_sel);
+    int i = 0;
 
-    IIC_SendAddress(address_high, address_low);
+    int memflag = 0;
 
+    int blocksize_temp = blocksize;
 
+    printf("\r\nData Written To Memory");
+
+    while (byteswritten < blocksize_temp){ /////////////////////////////////////maybe just <
+        //Send start command
+        address = address + numbytes;
+
+        block_sel = (address >> 16) & 0xF;  // extract most significant byte
+        address_high = (address >> 8) & 0xFF;  // extract high byte
+        address_low = address & 0xFF;  // extract low byte
+
+        if (block_sel == 0){
+            if ((address + 128 + 1) > 0x0ffff){
+                numbytes = (0x0ffff - address + 1);
+                memflag = 1;
+                i = 0;
+            }
+            else if (blocksize > 128){
+            numbytes = 128;
+            }
+            else{
+                numbytes = blocksize;
+            }
+        }
+        else {
+            if (blocksize > 128){
+                numbytes = 128;
+            }
+            else{
+                numbytes = blocksize;
+            }
+        }
+
+        IIC_StartCommand(block_sel);
+
+        IIC_SendAddress(address_high, address_low);
+
+        byteswritten = byteswritten + numbytes; //95
+
+        //printf("\r\nADDRESS IS %05X", address);
+        IIC_PageWrite(data, numbytes, address);
+        i = i + numbytes; //95
+        //printf("\r\nI VALUE IS %02X", i);
+        data = data + numbytes; //5F
+        blocksize = blocksize - numbytes; //135
+    }
 }
 
 void Wait500ms(void)
 {
     int i;
-    for (i = 0; i < 500; i++)
+    for (i = 0; i < 500; i++){
         Wait1ms();
+    }
 }
 
 void Wait1s(void)
 {
     int i;
-    for (i = 0; i < 1000; i++)
+    for (i = 0; i < 1000; i++){
         Wait1ms();
+    }
+}
+
+IIC_ReadDataBlock(int address, int blocksize){
+    int block_sel = (address >> 16) & 0xF;  // extract most significant byte
+    int address_high = (address >> 8) & 0xFF;  // extract high byte
+    int address_low = address & 0xFF;  // extract low byte
+
+    int temp_blocksize;
+
+    int flag = 0;
+
+    //Send start command
+
+    printf("\r\nData Read From Memory");
+    if (block_sel == 1){
+        IIC_StartCommand(block_sel);
+
+        IIC_SendAddress(address_high, address_low);
+
+        IIC_RepeatedStartCommand(block_sel);
+
+        IIC_SequentialRead(blocksize, address);
+    }
+    else if (block_sel == 0){
+        if ((address + blocksize + 1) > 0x0ffff){
+            temp_blocksize = (0xffff - address + 1);
+            flag = 1;
+        }
+        else{
+            temp_blocksize = blocksize;
+        }
+        IIC_StartCommand(block_sel);
+
+        IIC_SendAddress(address_high, address_low);
+
+        IIC_RepeatedStartCommand(block_sel);
+
+        IIC_SequentialRead(temp_blocksize, address);
+
+        temp_blocksize = blocksize - temp_blocksize;
+        Wait3ms();
+        WaitForAck();
+        PollTIPFlag();
+        if (flag == 1){
+            flag = 0;
+
+            IIC_ReadData(1);
+            IIC_ReadDataByte(0x10003, 1);
+            IIC_Control = 0x00;
+            PollTIPFlag();
+            IIC_Init();
+            IIC_ReadData(1);
+
+            IIC_StartCommand(0x01);
+
+            IIC_SendAddress(0x00, 0x00);
+
+            IIC_RepeatedStartCommand(0x01);
+
+            IIC_SequentialRead(temp_blocksize, 0x10000);
+
+        }
+    }
 }
 
 void SendI2C(char byte, char cmd) {
@@ -1090,6 +1279,8 @@ void SendI2C(char byte, char cmd) {
 }
 
 void DAC_Blinky() {
+    unsigned int i = 0;
+    int direction = 1;
     // Write Address
     printf("\r\nSending Slave Address");
     PollTIPFlag();
@@ -1101,19 +1292,21 @@ void DAC_Blinky() {
     SendI2C(0x40, WRITE);     // DAC Output, Write cmd 0x10
     WaitForAck();
 
-    printf("\r\nLED will pulse ON and OFF at a frequency of 500ms, with a duty cycle of 50%");
+    printf("\r\nLED will pulse ON and OFF at a frequency of 765ms, with a duty cycle of 50%");
 
-    // Continuous data stream w/ Blinky until reset
-    while (1) {
-        SendI2C(0xFF, WRITE);   // ON
-        Wait500ms();
-        SendI2C(0x00, WRITE);   // OFF
-        Wait500ms();
+    while(1) {
+        //printf("%x ", i);
+        SendI2C(i, WRITE);
+        Wait3ms();
+        i += direction;
+        if (i == 255 || i == 0) {
+            direction = -direction;
+        }
     }
 }
 
 void ReadADC() {
-    char ch0, ch1, ch2, ch3;
+    int ch0, ch1, ch2, ch3;
 
     while (1) {
         // Write Address
@@ -1162,16 +1355,17 @@ void ReadADC() {
         printf("\r\nCH3 Data Received");
 
         IIC_Command_Status = 0x41;
-        
+
         printf("\r\n............................");
         printf("\r\nExt. Analog Source: Disconnected");
         printf("\r\nPotentiometer: %d", ch3);
         printf("\r\nThermistor: %d", ch1);
         printf("\r\nPhotoresistor: %d", ch2);
-        
+
         Wait1s();
     }
 }
+
 
 
 /******************************************************************************************************************************
@@ -1239,7 +1433,7 @@ void main()
 /*************************************************************************************************
 **  User Program
 *************************************************************************************************/
-
+    printf("\r\nCreators: Patric McDonald: 81398729, Isabelle Andre: 12521589");
     printf("\r\nIIC program will begin");
     printf("\r\nEnter 0 ... Write Single Byte");
     printf("\r\nEnter 1 ... Read Single Byte");
@@ -1251,84 +1445,82 @@ void main()
 
     IIC_Init();
 
-    while (1) {
-
-        if (choice == '0') {
-            printf("Single Byte Write Initiated\r\nEnter Data Byte: ");
+    if (choice == '0') {
+        printf("Single Byte Write Initiated\r\nEnter Data Byte: ");
+        scanf("%x", &WriteData);
+        while (WriteData > 0xFF) {
+            printf("Enter Valid Data Byte: ");
             scanf("%x", &WriteData);
-            while (WriteData > 0xFF) {
-                printf("Enter Valid Data Byte: ");
-                scanf("%x", &WriteData);
-            }
-            printf("Enter Address (00000 - 1FFFF): ");
-            scanf("%x", &WriteAddress);
-            while (WriteAddress > 0x1FFFF) {
-                printf("Enter Valid Address: ");
-                scanf("%x", WriteAddress);
-            }
-            printf("\r\nWriting Data Byte ...");
-            IIC_WriteDataByte(WriteData, WriteAddress);
         }
-        else if (choice == '1') {
-            printf("\r\nSingle Byte Read Initiated\r\nEnter Address (00000 - 1FFFF): ");
-            scanf("%x", &ReadAddress);
-            while (ReadAddress > 0x1FFFF) {
-                printf("Enter Valid Address: ");
-                scanf("%x", &ReadAddress);
-            }
-            printf("\r\nReading Data Byte ...");
-            IIC_ReadDataByte(ReadAddress);
+        printf("Enter Address (00000 - 1FFFF): ");
+        scanf("%x", &WriteAddress);
+        while (WriteAddress > 0x1FFFF) {
+            printf("Enter Valid Address: ");
+            scanf("%x", WriteAddress);
         }
-        else if (choice == '2') {
-            printf("\r\nData Block Write Initiated\r\nEnter Starting Address (00000 - 1FFFF): ");
-            scanf("%x", &WriteBlockAddress);
-            while (WriteBlockAddress > 0x1FFFF) {
-                printf("Enter Valid Address: ");
-                scanf("%x", &WriteBlockAddress);
-            }
-            WriteBlockMaxSize = (0x1FFFF - WriteBlockAddress);
-            printf("Enter Data Block Size (00000 - %05X): ", WriteBlockMaxSize);
-            scanf("%x", &WriteBlockSize);
-            while (WriteBlockSize > WriteBlockMaxSize) {
-                printf("Enter Valid Block Size (00000 - %05X): ", WriteBlockMaxSize);
-                scanf("%x", &WriteBlockSize);
-            }
-            printf("Enter Starting Data Byte: ");
-            scanf("%x", &WriteBlockDataStart);
-            while (WriteBlockDataStart > 0xFF) {
-                printf("Enter Valid Data Byte: ");
-                scanf("%x", &WriteBlockDataStart);
-            }
-            IIC_WriteDataBlock(WriteBlockAddress, WriteBlockSize, WriteBlockDataStart);
-        }
-        else if (choice == '3') {
-            printf("\r\nData Block Read Initiated\r\nEnter Starting Address (00000 - 1FFFF): ");
-            scanf("%x", &ReadBlockAddress);
-            while (ReadBlockAddress > 0x1FFFF) {
-                printf("Enter Valid Address");
-                scanf("%x", &ReadBlockAddress);
-            }
-            ReadBlockMaxSize = (0x1FFFF - ReadBlockAddress);
-            printf("Enter Data Block Size (00000 - %05X): ", ReadBlockMaxSize);
-            scanf("%x", &ReadBlockSize);
-            while (ReadBlockSize > ReadBlockMaxSize) {
-                printf("Enter Valid Block Size (00000 - %05X): ", ReadBlockMaxSize);
-                scanf("%x", &ReadBlockSize);
-            }
-
-        }
-        else if (choice == '4') {
-            printf("\r\nWaveform DAC and LED Blinky Initiated\r\n");
-            DAC_Blinky();
-        }
-        else if (choice == '5') {
-            printf("\r\nRead Analog input from ADC Channel Initiated");
-            ReadADC();
-        }
-        else {
-            printf("\r\nInvalid Selection, Please Select an Option Between 0-5.");
-        }
-        printf("\r\nProgram ended");
+        printf("\r\nWriting Data Byte ...");
+        IIC_WriteDataByte(WriteData, WriteAddress);
     }
+    else if (choice == '1') {
+        printf("\r\nSingle Byte Read Initiated\r\nEnter Address (00000 - 1FFFF): ");
+        scanf("%x", &ReadAddress);
+        while (ReadAddress > 0x1FFFF) {
+            printf("Enter Valid Address: ");
+            scanf("%x", &ReadAddress);
+        }
+        printf("\r\nReading Data Byte ...");
+        IIC_ReadDataByte(ReadAddress, 0);
+    }
+    else if (choice == '2') {
+        printf("\r\nData Block Write Initiated\r\nEnter Starting Address (00000 - 1FFFF): ");
+        scanf("%x", &WriteBlockAddress);
+        while (WriteBlockAddress > 0x1FFFF) {
+            printf("Enter Valid Address: ");
+            scanf("%x", &WriteBlockAddress);
+        }
+        WriteBlockMaxSize = (0x1FFFF - WriteBlockAddress + 1);
+        printf("Enter Data Block Size (00000 - %d): ", WriteBlockMaxSize);
+        scanf("%d", &WriteBlockSize);
+        while (WriteBlockSize > WriteBlockMaxSize){
+            printf("Enter Valid Block Size (00000 - %d): ", WriteBlockMaxSize);
+            scanf("%d", &WriteBlockSize);
+        }
+        printf("Enter Starting Data Byte: ");
+        scanf("%x", &WriteBlockDataStart);
+        while (WriteBlockDataStart > 0xFF) {
+            printf("Enter Valid Data Byte: ");
+            scanf("%x", &WriteBlockDataStart);
+        }
+        IIC_WriteDataBlock(WriteBlockAddress, WriteBlockSize, WriteBlockDataStart);
+    }
+    else if (choice == '3') {
+        printf("\r\nData Block Read Initiated\r\nEnter Starting Address (00000 - 1FFFF): ");
+        scanf("%x", &ReadBlockAddress);
+        while (ReadBlockAddress > 0x1FFFF) {
+            printf("Enter Valid Address");
+            scanf("%x", &ReadBlockAddress);
+        }
+        ReadBlockMaxSize = (0x1FFFF - ReadBlockAddress + 1);
+        printf("Enter Data Block Size (0 - %d): ", ReadBlockMaxSize);
+        scanf("%d", &ReadBlockSize);
+        while (ReadBlockSize > ReadBlockMaxSize) {
+            printf("Enter Valid Block Size (00000 - %d): ", ReadBlockMaxSize);
+            scanf("%d", &ReadBlockSize);
+        }
+        IIC_ReadDataBlock(ReadBlockAddress, ReadBlockSize);
+
+    }
+    else if (choice == '4') {
+        printf("\r\nWaveform DAC and LED Blinky Initiated\r\n");
+        DAC_Blinky();
+    }
+    else if (choice == '5') {
+        printf("\r\nRead Analog input from ADC Channel Initiated");
+        ReadADC();
+    }
+    else {
+        printf("\r\nInvalid Selection, Please Select an Option Between 0-5.");
+    }
+    printf("\r\nProgram ended");
 
 }
