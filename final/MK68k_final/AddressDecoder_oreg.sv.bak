@@ -1,0 +1,36 @@
+module AddressDecoder_oreg (
+	input logic clk,
+	input logic reset_L, 				// active low
+	input logic [1:0] Address_Ctrl,
+	input logic [7:0] Data_Ctrl
+	output logic [7:0] crx_out,
+	output logic [7:0] cry_out,
+	output logic [7:0] ctl_out
+);
+
+logic crx_enable, cry_enable, ctl_enable; 	// 1, 2, 3
+
+assign crx_enable = (Address_Ctrl == 2'b01) ? 1'b1 : 1'b0;
+assign cry_enable = (Address_Ctrl == 2'b10) ? 1'b1 : 1'b0;
+assign ctl_enable = (Address_Ctrl == 2'b11) ? 1'b1 : 1'b0;
+
+always_ff @(posedge clk or negedge reset_L) begin
+	if (!reset_L) begin
+		crx_out <= 8'b0010_0100;	// 40
+		cry_out <= 8'b0001_0100;    // 20
+		ctl_out <= 8'b1111_0010;
+	end
+	else begin
+		if (crx_enable) begin
+			crx_out <= Data_Ctrl;
+		end
+		else if (cry_enable) begin
+			cry_out <= Data_Ctrl;
+		end
+		else if (ctl_enable) begin
+			ctl_out <= Data_Ctrl;
+		end
+	end
+end
+
+endmodule

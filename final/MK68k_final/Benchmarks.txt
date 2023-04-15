@@ -1,0 +1,16 @@
+Isabelle Andre - 12521589
+Speed Test Program
+
+No Cache 25 MHz Design:
+Time (min) - 1:46:43
+Speedup - 1x
+
+Cached 32 Line 45 MHz Design:
+Time (min) - 1:10:63
+Speedup - 1.51x
+
+Cached 512 Line 45 MHz Design:
+Time (min) - 1:02:60
+Speedup - 1.71x
+
+
